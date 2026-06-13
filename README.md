@@ -2,6 +2,8 @@
 
 Multi-take motion-capture analysis, in your browser.
 
+**Live → [bloechle.github.io/kinesa](https://bloechle.github.io/kinesa/)**
+
 Drop one or more mocap recordings (Motive CSV, TOPLabs JSON, or a ZIP
 containing several) onto the player. The first take becomes the
 **master**; each subsequent take is a **slave** with its own knob on
