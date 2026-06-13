@@ -1,0 +1,40 @@
+# IDEs
+.idea/
+*.iml
+.vscode/
+out/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+
+# AI bundles / scratch
+_ai-*
+
+# Node (only if you later add tooling)
+node_modules/
+npm-debug.log*
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.map
+
+# Editor / temp
+*.swp
+*.swo
+*.tmp
+*.temp
+*.log
+logs/

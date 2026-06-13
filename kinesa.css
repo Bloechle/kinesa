@@ -1,0 +1,319 @@
+/* =====================================================================
+   kinesa.css v1.0.0
+   App-specific styles on top of qry-ui.css (CDN, gh/Bloechle/qry-js@1.1.0).
+   Shell, tokens & fonts (IBM Plex Sans/Mono) come from qry-ui.css;
+   toasts are Shoelace <sl-alert> via qry-kit.
+   Cinema-mode colors below are deliberately hard-coded (pure-black
+   scene, glass overlays) — they are theme-independent by design.
+   ===================================================================== */
+
+/* ── CSS custom props ────────────────────────────────────────────────── */
+:root {
+    --scene-bg:        #0d1117;
+    --glass-bg:        rgba(15, 20, 30, 0.55);
+    --glass-border:    rgba(255, 255, 255, 0.10);
+    --glass-blur:      blur(14px);
+    --ease-out:        cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+    --accent:          #005395;
+    --accent-glow:     rgba(0, 83, 149, 0.35);
+}
+
+/* ── Sidebar: no logo → align collapse button right, reduce top space ─ */
+.qry-sidebar-head {
+    justify-content: flex-end;
+    height: auto;
+    padding: 0.5rem 0.875rem;
+}
+
+/* ── Scene container — cinema mode (edge-to-edge, pure black) ────────── */
+#section-player::part(body) { padding: 0; }
+
+.kinesa-scene {
+    width: 100%;
+    height: 520px;
+    background: #000;
+    border-radius: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+    position: relative;
+    box-shadow: none;
+}
+
+.kinesa-scene canvas {
+    display: block;
+    width:  100% !important;
+    height: 100% !important;
+}
+
+@media (max-width: 768px) {
+    .kinesa-scene { height: 380px; }
+}
+
+/* Re-pad the controls and the player bar since the card body padding
+   was zeroed for the scene to go edge-to-edge. */
+.kinesa-controls  { padding: 0.875rem 1.5rem 0.5rem; }
+.kinesa-playerbar { padding: 0 1.5rem 1.25rem; }
+
+/* ── Scene overlay groups ────────────────────────────────────────────── */
+.kinesa-scene-left,
+.kinesa-scene-right {
+    position: absolute;
+    top: 0.75rem;
+    z-index: 10;
+    display: flex;
+    gap: 0.25rem;
+    background: rgba(15, 20, 30, 0.55);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 11px;
+    padding: 0.3rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.kinesa-scene-left  { left:  0.75rem; }
+.kinesa-scene-right { right: 0.75rem; }
+
+/* ── Scene overlay buttons ───────────────────────────────────────────── */
+.kinesa-scene-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.72rem;
+    font-family: inherit;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+    white-space: nowrap;
+}
+
+.kinesa-scene-btn:hover {
+    background: rgba(255, 255, 255, 0.10);
+    color: #fff;
+}
+
+.kinesa-scene-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 12px -2px var(--accent-glow);
+}
+
+.kinesa-scene-btn i,
+.kinesa-scene-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+@media (max-width: 600px) {
+    .kinesa-scene-btn span { display: none; }
+    .kinesa-scene-btn      { padding: 0.3rem 0.4rem; }
+}
+
+/* ── Main section cards — shadow ─────────────────────────────────────── */
+#section-player,
+#section-analysis {
+    box-shadow: var(--qry-shadow);
+}
+
+/* ── Playback controls ───────────────────────────────────────────────── */
+.kinesa-controls {
+    margin-bottom: 1rem;
+}
+
+/* Round playback buttons — force equal width/height for perfect circle */
+#btn-step-back::part(base),
+#btn-step-fwd::part(base),
+#btn-play::part(base) {
+    border-radius: 9999px;
+    aspect-ratio: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#btn-step-back::part(base),
+#btn-step-fwd::part(base) {
+    width: 2.4rem;
+    height: 2.4rem;
+    box-shadow: 0 2px 8px rgba(0, 53, 95, 0.12);
+}
+
+#btn-play::part(base) {
+    width: 3.2rem;
+    height: 3.2rem;
+    box-shadow: 0 4px 16px rgba(0, 83, 149, 0.30);
+}
+
+/* Frame / time read-out — flat monospace, no pill (it's display-only,
+ * a button-like background reads as a false affordance). */
+#frame-display,
+#time-display {
+    font-family: 'IBM Plex Mono', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #475569;
+    letter-spacing: 0.02em;
+}
+
+/* Player bar: single row under the timeline.
+ * Three regions — left (play), centre (read-out), right (actions) — using
+ * a 1fr / auto / 1fr grid so the read-out stays exactly centred regardless
+ * of the differing widths of the side clusters. */
+.kinesa-playerbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 0.25rem;
+}
+.kinesa-playerbar-left    { display: flex; align-items: center; gap: 0.5rem; justify-self: start; }
+.kinesa-playerbar-readout { display: flex; align-items: center; gap: 0.6rem; justify-self: center; white-space: nowrap; }
+.kinesa-playerbar-right   { display: flex; align-items: center; gap: 0.6rem; justify-self: end; }
+.kinesa-readout-sep       { color: var(--sl-color-neutral-400); font-weight: 400; }
+
+/* On narrow viewports, drop the grid: stack [play] / [actions] and hide the
+ * centred read-out (the timeline tooltip already exposes the frame number). */
+@media (max-width: 720px) {
+    .kinesa-playerbar             { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .kinesa-playerbar-readout     { display: none; }
+    .kinesa-playerbar-right       { justify-self: end; }
+}
+
+/* Play button pulse animation when playing */
+@keyframes play-pulse {
+    0%   { box-shadow: 0 0 0 0   var(--accent-glow); }
+    70%  { box-shadow: 0 0 0 10px transparent; }
+    100% { box-shadow: 0 0 0 0   transparent; }
+}
+
+/* Speed preset group */
+.qry-btn-group-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+}
+
+/* ── Section fade-in on load ─────────────────────────────────────────── */
+@keyframes section-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+#section-player  { animation: section-in 0.4s var(--ease-out) both; }
+#section-analysis { animation: section-in 0.4s var(--ease-out) 0.08s both; }
+
+/* ── Graph area ──────────────────────────────────────────────────────── */
+#chart-widget svg        { max-width: 100%; }
+#chart-widget path       { transition: stroke-width 0.2s var(--ease-out); }
+#chart-widget path:hover { stroke-width: 3px; }
+
+/* ── Graph cards ─────────────────────────────────────────────────────── */
+.kinesa-graph-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid rgba(0, 83, 149, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.kinesa-graph-card:hover {
+    border-color: rgba(0, 83, 149, 0.16);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px -6px rgba(0, 53, 95, 0.06);
+}
+
+.kinesa-graph-card h4 {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.7rem;
+}
+
+.kinesa-graph-msg {
+    padding: 2.5rem 1rem;
+    border-radius: 12px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.875rem;
+    display: none;
+    border: 1px dashed rgba(0, 83, 149, 0.18);
+    background: rgba(0, 83, 149, 0.015);
+}
+
+/* ── Frame marker ────────────────────────────────────────────────────── */
+.chart-frame-marker { color: #94a3b8; }
+.chart-frame-label  { color: #64748b; }
+.chart-zero-line    { stroke: #e2e8f0; }
+
+/* ── Info dialog ─────────────────────────────────────────────────────── */
+/* Width is set inline on <sl-dialog style="--width: 480px"> in index.html.
+   Internal layout / typography of the take info content is owned by
+   InfoWidget.js (inline styles using Shoelace neutral palette). */
+
+/* ── Fullscreen mode ─────────────────────────────────────────────────── */
+.kinesa-fs-close { display: none; }
+#section-player.fullscreen .kinesa-fs-close { display: flex; }
+
+#section-player.fullscreen {
+    position: fixed;
+    inset: 0.75rem;
+    z-index: 10000;
+    border-radius: 14px;
+    animation: none;
+}
+
+#section-player.fullscreen::part(body)  { padding: 1.25rem 1.75rem; }
+#section-player.fullscreen::part(base) {
+    border-radius: 14px;
+    backdrop-filter: none;
+    height: 100%;
+    overflow: hidden;
+}
+
+#section-player.fullscreen .kinesa-scene {
+    height: calc(100vh - 14rem);
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
+}
+
+#section-player.fullscreen .kinesa-scene-left,
+#section-player.fullscreen .kinesa-scene-right { z-index: 20; }
+
+/* ── Scene config dialog ─────────────────────────────────────────────── */
+.kinesa-config-dialog::part(panel) { max-width: 420px; }
+
+.kinesa-cfg-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.85rem 1.1rem;
+    align-items: center;
+}
+
+.kinesa-cfg-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.kinesa-cfg-control           { display: flex; align-items: center; gap: 0.6rem; }
+.kinesa-cfg-control sl-range  { flex: 1; --track-height: 3px; }
+
+.kinesa-cfg-val {
+    font-size: 0.72rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: #64748b;
+    min-width: 3rem;
+    text-align: right;
+    background: rgba(0, 83, 149, 0.06);
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+}
+
+.kinesa-cfg-control sl-color-picker { --grid-width: 200px; }

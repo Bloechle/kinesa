@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinesa</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23005395' stroke-width='2'><circle cx='12' cy='5' r='2'/><path d='M12 7v5m-3 3l3-3 3 3m-6 2l3 4 3-4'/></svg>">
+
+    <!-- Importmap (Three.js + qry-kit) — MUST precede all module scripts.
+         Bare specifiers keep version pins in ONE place. -->
+    <script type="importmap">
+        { "imports": {
+            "three":        "https://unpkg.com/three@0.150.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/",
+            "qry-kit": "https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry-kit.js"
+        } }
+    </script>
+
+    <!-- Shoelace (widgets) — load BOTH themes so dark mode works -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Theme fonts (qry-ui.css references IBM Plex but does not load it) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+    <!-- qry-ui.css (shell) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry-ui.css">
+
+    <!-- Icons, D3, JSZip -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- qry.js core (global $) — must load before module scripts -->
+    <script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry.js"></script>
+
+    <link rel="stylesheet" href="kinesa.css">
+</head>
+
+<body class="qry-app">
+
+<!-- HEADER -->
+<header class="qry-header fixed">
+    <div class="flex items-center gap-3">
+        <h1><i data-lucide="activity"></i> Kinesa <span style="opacity:0.55; font-weight:400; font-size:0.72rem; margin-left:0.35rem; letter-spacing:0">v1.0.0 · motion analysis</span></h1>
+    </div>
+    <div class="flex items-center gap-1">
+        <button id="btn-upload" class="qry-btn" title="Upload CSV / JSON file (or drag-drop onto the viewer)">
+            <i data-lucide="upload"></i>
+        </button>
+        <button id="btn-scene-config" class="qry-btn" title="Scene settings (display options)">
+            <i data-lucide="sliders-horizontal"></i>
+        </button>
+        <button id="btn-help" class="qry-btn" title="Shortcuts &amp; gestures (?)">
+            <i data-lucide="circle-help"></i>
+        </button>
+    </div>
+</header>
+
+<div id="qry-overlay" class="qry-overlay"></div>
+
+<div class="qry-dashboard">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="qry-sidebar fixed mobile collapsed">
+        <div class="qry-sidebar-head">
+            <button id="btn-collapse" class="qry-btn" title="Toggle sidebar (Ctrl+B)" aria-label="Toggle sidebar">
+                <i data-lucide="panel-left-open"></i>
+            </button>
+        </div>
+
+        <div class="qry-sidebar-body">
+            <nav class="qry-sidebar-nav">
+                <div class="qry-sidebar-label">Batch</div>
+                <a id="btn-batch-convert" class="qry-sidebar-link" title="Batch convert CSV / JSON / ZIP files to a single JSON bundle">
+                    <i data-lucide="file-stack"></i>
+                    <span class="qry-sidebar-text">Convert to JSON</span>
+                </a>
+                <a id="btn-batch-trim" class="qry-sidebar-link" title="Trim each JSON to its saved region of interest (ROI)">
+                    <i data-lucide="scissors"></i>
+                    <span class="qry-sidebar-text">Trim by ROI</span>
+                </a>
+            </nav>
+
+            <nav class="qry-sidebar-nav">
+                <div class="qry-sidebar-label">Analysis</div>
+                <a id="btn-cascade" class="qry-sidebar-link" title="Proximal→distal cascade — plot the kinetic chain of the dominant side (C)">
+                    <i data-lucide="trending-up"></i>
+                    <span class="qry-sidebar-text">Cascade</span>
+                </a>
+                <a id="btn-detect-leg" class="qry-sidebar-link" title="Detect leg from 3 free markers (click again to clear)">
+                    <i data-lucide="footprints"></i>
+                    <span class="qry-sidebar-text">Detect Leg</span>
+                </a>
+            </nav>
+
+            <nav class="qry-sidebar-nav">
+                <div class="qry-sidebar-label">Session</div>
+                <a id="btn-clear-session" class="qry-sidebar-link" title="Forget remembered alignments / locks / POI / ROI per take name">
+                    <i data-lucide="eraser"></i>
+                    <span class="qry-sidebar-text">Clear memory</span>
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="qry-content">
+
+        <div id="dnd-overlay" class="qry-drop-overlay local">
+            <div class="qry-drop-overlay-inner">
+                <i data-lucide="upload-cloud"></i>
+                <p>Drop MoCap files here</p>
+                <span>Motive CSV · TOPLabs JSON · ZIP &nbsp;·&nbsp; <kbd>Ctrl</kbd>+drop to add to current takes</span>
+            </div>
+        </div>
+
+        <input type="file" id="file-input" accept=".json,.csv,.zip" multiple class="hidden">
+
+        <div class="qry-grid">
+
+            <!-- 3D Player -->
+            <sl-card id="section-player" class="qry-card qry-grid-full">
+                <div slot="header" class="flex justify-between items-center w-full">
+                    <h3 class="qry-card-title">
+                        <i data-lucide="play-circle"></i>
+                        <span id="player-title">Kinesa</span>
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-info" class="qry-btn" title="Take info">
+                            <i data-lucide="info"></i>
+                        </button>
+                        <sl-button id="btn-download" variant="neutral" size="small"
+                                   title="Download the current take as JSON (with ROI / POI metadata)">
+                            <sl-icon slot="prefix" name="download"></sl-icon>
+                            Download JSON
+                        </sl-button>
+                        <button id="btn-fs-close" class="kinesa-fs-close qry-btn" title="Exit fullscreen">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="scene-container" class="kinesa-scene">
+                    <!-- Camera views — top left -->
+                    <div class="kinesa-scene-left">
+                        <button class="kinesa-scene-btn active" data-view="perspective" title="3D perspective">
+                            <i data-lucide="box"></i><span>3D</span>
+                        </button>
+                        <button class="kinesa-scene-btn" data-view="front" title="Front">
+                            <i data-lucide="arrow-up"></i><span>Front</span>
+                        </button>
+                        <button class="kinesa-scene-btn" data-view="side" title="Side">
+                            <i data-lucide="arrow-right"></i><span>Side</span>
+                        </button>
+                        <button class="kinesa-scene-btn" data-view="top" title="Top">
+                            <i data-lucide="arrow-down"></i><span>Top</span>
+                        </button>
+                    </div>
+
+                    <!-- Scene toggles — top right -->
+                    <div class="kinesa-scene-right">
+                        <button id="btn-history" class="kinesa-scene-btn" title="Position trails">
+                            <i data-lucide="git-branch"></i><span>Trails</span>
+                        </button>
+                        <button id="btn-center" class="kinesa-scene-btn" title="Center on selection">
+                            <i data-lucide="crosshair"></i><span>Center</span>
+                        </button>
+                        <button id="btn-free-markers" class="kinesa-scene-btn" title="Unlabeled markers">
+                            <i data-lucide="sparkles"></i><span>Markers</span>
+                        </button>
+                        <button id="btn-ghost" class="kinesa-scene-btn" title="Ghost overlay — superimpose takes (G)">
+                            <i data-lucide="ghost"></i><span>Ghost</span>
+                        </button>
+                        <button id="btn-screenshot" class="kinesa-scene-btn" title="Screenshot of the 3D scene">
+                            <i data-lucide="camera"></i>
+                        </button>
+                        <button id="btn-fullscreen" class="kinesa-scene-btn" title="Fullscreen">
+                            <i data-lucide="maximize"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Frame scrubber + analysis window (unified) -->
+                <div class="kinesa-controls">
+                    <div id="timeline-slider" class="w-full"
+                         title="Drag playhead to scrub · drag handles for region of interest · double-click on band to reset · double-click elsewhere to set point of interest (or press P at playhead)"></div>
+                </div>
+
+                <!-- Player bar: [play group] · [readout] · [actions] -->
+                <div class="kinesa-playerbar">
+                    <div class="kinesa-playerbar-left">
+                        <sl-button id="btn-step-back" variant="neutral" size="small" circle>
+                            <sl-icon name="skip-start-fill"></sl-icon>
+                        </sl-button>
+                        <sl-button id="btn-play" variant="primary" size="large" circle>
+                            <sl-icon id="play-icon" name="play-fill"></sl-icon>
+                        </sl-button>
+                        <sl-button id="btn-step-fwd" variant="neutral" size="small" circle>
+                            <sl-icon name="skip-end-fill"></sl-icon>
+                        </sl-button>
+                    </div>
+
+                    <div class="kinesa-playerbar-readout">
+                        <span id="frame-display" class="qry-mono">Frame 0 / 0</span>
+                        <span class="kinesa-readout-sep">·</span>
+                        <span id="time-display"  class="qry-mono">0:00.000</span>
+                    </div>
+
+                    <div class="kinesa-playerbar-right">
+                        <sl-button id="btn-snap-peak" variant="neutral" size="small"
+                                   title="Snap POI + ROI to the peak of the active metric on selected nodes (S)">
+                            <sl-icon slot="prefix" name="lightning-charge-fill"></sl-icon>
+                            Snap to peak
+                        </sl-button>
+                        <div class="qry-btn-group" id="speed-group">
+                            <button class="qry-btn-group-item" data-speed="50">0.5×</button>
+                            <button class="qry-btn-group-item active" data-speed="100">1×</button>
+                            <button class="qry-btn-group-item" data-speed="150">1.5×</button>
+                            <button class="qry-btn-group-item" data-speed="200">2×</button>
+                        </div>
+                    </div>
+                </div>
+            </sl-card>
+
+            <!-- Motion Analysis -->
+            <sl-card id="section-analysis" class="qry-card qry-grid-full">
+                <div slot="header" class="flex justify-between items-center w-full">
+                    <h3 class="qry-card-title">
+                        <i data-lucide="line-chart"></i> Motion Analysis
+                    </h3>
+                    <sl-button id="btn-export" variant="neutral" size="small">
+                        <sl-icon slot="prefix" name="download"></sl-icon>
+                        Export CSV
+                    </sl-button>
+                </div>
+                <div id="chart-widget"></div>
+            </sl-card>
+
+        </div>
+    </main>
+</div>
+
+<!-- FOOTER -->
+<footer class="qry-footer">
+    Kinesa · Developed by TOPLabs
+</footer>
+
+<!-- TAKE INFO DIALOG -->
+<sl-dialog id="info-dialog" label="Take Information" class="kinesa-info-dialog" style="--width: 480px">
+    <div id="info-widget"></div>
+    <sl-button slot="footer" variant="primary" id="btn-close-info">Close</sl-button>
+</sl-dialog>
+
+<!-- HELP DIALOG -->
+<sl-dialog id="help-dialog" label="Shortcuts &amp; Gestures" class="kinesa-help-dialog" style="--width: 720px">
+    <div class="kinesa-help-grid">
+        <section class="kinesa-help-section">
+            <h4>Playback</h4>
+            <dl>
+                <dt><kbd>Space</kbd></dt>            <dd>Play / pause</dd>
+                <dt><kbd>←</kbd> <kbd>→</kbd></dt>   <dd>Step playhead by 1 frame (10 with <kbd>Shift</kbd>)</dd>
+                <dt><kbd>F</kbd></dt>                <dd>Toggle fullscreen</dd>
+                <dt><kbd>G</kbd></dt>                <dd>Ghost overlay — superimpose takes</dd>
+                <dt><kbd>Esc</kbd></dt>              <dd>Close dialog · exit fullscreen</dd>
+            </dl>
+        </section>
+
+        <section class="kinesa-help-section">
+            <h4>Multi-take alignment</h4>
+            <dl>
+                <dt>Drop a 2nd file</dt>             <dd>Adds a slave take (1st = master)</dd>
+                <dt><kbd>Ctrl</kbd>+drop</dt>        <dd>Append to current takes (default = replace)</dd>
+                <dt>Drag knob</dt>                   <dd>Align a slave manually</dd>
+                <dt>Drag master flag</dt>            <dd>Shift slaves with the master</dd>
+                <dt>Hover chip + <kbd>←</kbd>/<kbd>→</kbd></dt> <dd>Nudge that slave by 1 frame (10 with <kbd>Shift</kbd>)</dd>
+                <dt>Hover chip + <kbd>L</kbd></dt>    <dd>Toggle alignment lock</dd>
+                <dt>Hover chip + <kbd>Del</kbd></dt>  <dd>Remove that slave (master can't be removed)</dd>
+                <dt>🔒 chip icon</dt>                <dd>Lock slave — snap-to-peak skips it</dd>
+                <dt>👁 chip icon</dt>                <dd>Hide / show in 3D scene</dd>
+                <dt><kbd>S</kbd></dt>                <dd>Snap-to-peak: align all unlocked takes by metric peak</dd>
+                <dt><kbd>C</kbd></dt>                <dd>Cascade: plot the dominant side's kinetic chain, proximal→distal</dd>
+            </dl>
+        </section>
+
+        <section class="kinesa-help-section">
+            <h4>Analysis markers</h4>
+            <dl>
+                <dt><kbd>P</kbd></dt>                <dd>Set / clear POI at the playhead</dd>
+                <dt>Drag handles</dt>                <dd>Set region of interest (ROI)</dd>
+                <dt>Double-click on band</dt>        <dd>Reset ROI</dd>
+                <dt>Double-click elsewhere</dt>      <dd>Set / clear POI at click frame</dd>
+            </dl>
+        </section>
+
+        <section class="kinesa-help-section">
+            <h4>Data</h4>
+            <dl>
+                <dt>Drop on viewer</dt>              <dd>Load takes (replaces unless <kbd>Ctrl</kbd>+drop)</dd>
+                <dt>Sidebar → Batch</dt>             <dd>Open a batch dialog</dd>
+                <dt>Click chart</dt>                 <dd>Seek playhead</dd>
+                <dt><kbd>Ctrl</kbd>+<kbd>E</kbd></dt> <dd>Export current chart as CSV</dd>
+                <dt>Re-drop a known file</dt>        <dd>Restores remembered alignment / lock / POI / ROI</dd>
+                <dt>Sidebar → Clear memory</dt>      <dd>Forget remembered alignments</dd>
+            </dl>
+        </section>
+
+        <section class="kinesa-help-section">
+            <h4>Interface</h4>
+            <dl>
+                <dt><kbd>Ctrl</kbd>+<kbd>B</kbd></dt> <dd>Toggle sidebar</dd>
+                <dt><kbd>?</kbd></dt>                 <dd>Show this help</dd>
+            </dl>
+        </section>
+    </div>
+
+    <p class="kinesa-help-foot">
+        ROI &amp; POI are persisted in the JSON's metadata when you download — they round-trip on re-open and feed the Batch operations (<em>Trim by ROI</em> · <em>Merge POI-aligned</em>).
+    </p>
+
+    <sl-button slot="footer" variant="primary" id="btn-close-help">Close</sl-button>
+</sl-dialog>
+
+<style>
+/* ── Shared dialog refinements ─────────────────────────────────────── */
+sl-dialog.kinesa-info-dialog,
+sl-dialog.kinesa-help-dialog,
+sl-dialog.kinesa-batch-dialog {
+    --header-spacing:  1.25rem;
+    --body-spacing:    1.5rem;
+    --footer-spacing:  1rem;
+}
+sl-dialog.kinesa-info-dialog::part(title),
+sl-dialog.kinesa-help-dialog::part(title),
+sl-dialog.kinesa-batch-dialog::part(title) {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--sl-color-neutral-900);
+}
+
+/* ── Help dialog ───────────────────────────────────────────────────── */
+.kinesa-help-dialog .kinesa-help-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.75rem 2.5rem;
+}
+.kinesa-help-dialog .kinesa-help-section h4 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--sl-color-neutral-900);
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--sl-color-neutral-200);
+}
+.kinesa-help-dialog .kinesa-help-section dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: 1rem;
+    row-gap: 0.55rem;
+    margin: 0;
+    align-items: baseline;
+}
+.kinesa-help-dialog .kinesa-help-section dt {
+    font-size: 0.8rem;
+    color: var(--sl-color-neutral-600);
+    white-space: nowrap;
+}
+.kinesa-help-dialog .kinesa-help-section dd {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--sl-color-neutral-800);
+}
+.kinesa-help-dialog .kinesa-help-foot {
+    margin: 1.75rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--sl-color-neutral-200);
+    font-size: 0.75rem;
+    color: var(--sl-color-neutral-500);
+    line-height: 1.55;
+}
+.kinesa-help-dialog .kinesa-help-foot em {
+    font-style: normal;
+    color: var(--sl-color-neutral-700);
+    font-weight: 500;
+}
+@media (max-width: 680px) {
+    sl-dialog.kinesa-help-dialog { --width: 92vw; }
+    .kinesa-help-dialog .kinesa-help-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+
+/* ── Keyboard badges (used in help dialog) ─────────────────────────── */
+.kinesa-help-dialog kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6rem;
+    height: 1.45rem;
+    padding: 0 0.45rem;
+    margin: 0 0.05rem;
+    font-family: var(--sl-font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--sl-color-neutral-700);
+    background: var(--sl-color-neutral-50);
+    border: 1px solid var(--sl-color-neutral-300);
+    border-bottom-width: 2px;
+    border-radius: 0.35rem;
+    line-height: 1;
+    vertical-align: middle;
+}
+</style>
+
+<!-- BATCH DIALOG -->
+<sl-dialog id="batch-dialog" label="Batch" class="kinesa-batch-dialog" style="--width: 540px">
+    <div id="batch-drop-zone" style="
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 0.75rem; padding: 2.5rem 1.5rem;
+        border: 2px dashed var(--sl-color-neutral-300);
+        border-radius: 0.75rem;
+        background: var(--sl-color-neutral-50);
+        text-align: center; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;">
+        <i data-lucide="upload-cloud" style="width:42px;height:42px;color:var(--sl-color-primary-500)"></i>
+        <div id="batch-dialog-title" style="font-size:1rem;font-weight:600;color:var(--sl-color-neutral-900)">
+            Convert to JSON
+        </div>
+        <div id="batch-dialog-desc" style="font-size:0.875rem;color:var(--sl-color-neutral-600)">
+            Drop CSV · JSON · ZIP files here — or click to pick
+        </div>
+        <input type="file" id="batch-file-input" multiple class="hidden" accept=".csv,.json,.zip">
+    </div>
+
+    <div id="batch-progress" style="
+        display: none; flex-direction: column; align-items: center;
+        gap: 1rem; padding: 2.5rem 1.5rem;
+        border-radius: 0.75rem;
+        background: var(--sl-color-neutral-50);">
+        <div style="font-size:1rem;font-weight:600;color:var(--sl-color-neutral-900)">
+            Processing…
+        </div>
+        <div style="width:100%; height:8px; background:var(--sl-color-neutral-200); border-radius:4px; overflow:hidden;">
+            <div id="batch-progress-fill" style="height:100%; width:0%; background:var(--sl-color-primary-500); transition: width 0.15s;"></div>
+        </div>
+        <div id="batch-progress-detail" style="font-size:0.8rem;color:var(--sl-color-neutral-600); min-height:1.2em; font-family: var(--sl-font-mono, monospace);">
+            &nbsp;
+        </div>
+    </div>
+
+    <sl-button slot="footer" id="btn-batch-close">Close</sl-button>
+</sl-dialog>
+
+<!-- SCENE CONFIG DIALOG -->
+<sl-dialog id="config-dialog" label="Scene Settings" class="kinesa-config-dialog">
+    <div class="kinesa-cfg-grid">
+        <label class="kinesa-cfg-label">Grid</label>
+        <div class="kinesa-cfg-control">
+            <sl-switch id="cfg-grid" checked></sl-switch>
+        </div>
+
+        <label class="kinesa-cfg-label">Joint Size</label>
+        <div class="kinesa-cfg-control">
+            <sl-range id="cfg-joint-size" min="0.004" max="0.04" step="0.001" value="0.026" tooltip="none"></sl-range>
+            <span id="cfg-joint-size-val" class="kinesa-cfg-val">0.026</span>
+        </div>
+
+        <label class="kinesa-cfg-label">Bone Width</label>
+        <div class="kinesa-cfg-control">
+            <sl-range id="cfg-bone-width" min="0.008" max="0.05" step="0.001" value="0.016" tooltip="none"></sl-range>
+            <span id="cfg-bone-width-val" class="kinesa-cfg-val">0.016</span>
+        </div>
+
+        <label class="kinesa-cfg-label">Marker Size</label>
+        <div class="kinesa-cfg-control">
+            <sl-range id="cfg-marker-size" min="0.004" max="0.04" step="0.001" value="0.026" tooltip="none"></sl-range>
+            <span id="cfg-marker-size-val" class="kinesa-cfg-val">0.026</span>
+        </div>
+
+        <label class="kinesa-cfg-label">Joint Color</label>
+        <div class="kinesa-cfg-control">
+            <sl-color-picker id="cfg-joint-color" value="#5599cc" size="small" no-format-toggle format="hex" hoist></sl-color-picker>
+        </div>
+
+        <label class="kinesa-cfg-label">Marker Color</label>
+        <div class="kinesa-cfg-control">
+            <sl-color-picker id="cfg-marker-color" value="#cc0000" size="small" no-format-toggle format="hex" hoist></sl-color-picker>
+        </div>
+    </div>
+    <div slot="footer" class="flex justify-between w-full">
+        <sl-button id="btn-cfg-reset" variant="neutral" size="small">Reset Defaults</sl-button>
+        <sl-button id="btn-cfg-close" variant="primary"  size="small">Done</sl-button>
+    </div>
+</sl-dialog>
+
+<!-- APP INIT — $ is global from qry.js, glue from qry-kit (importmap) -->
+<script type="module">
+    import { boot } from 'qry-kit';
+    import { KinesaApp } from './app/KinesaApp.js';
+
+    // theme:false — Kinesa is cinema-mode (pinned light shell, pure-black
+    // scene); boot still renders the <i data-lucide> placeholders on ready.
+    boot({
+        theme: false,
+        ready: () => {
+            const app = new KinesaApp();
+            window.on('beforeunload', () => app.destroy());
+        },
+    });
+</script>
+
+</body>
+</html>
+
